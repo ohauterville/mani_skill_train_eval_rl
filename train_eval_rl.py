@@ -8,24 +8,37 @@ import numpy as np
 import torch
 import imageio
 import datetime
+import os
 
-total_timesteps = 150000
 SEED = 42
-model_file = "models/" + "ppo_pick_cube"
+
+TASK = 'PickCube-v1'
+OBS = "state"
+CTR = "pd_ee_delta_pose"
+RDR = "rgb_array"
+
+TTS = 50000#0 # total_timesteps
+
+models_folder = "models/"
+model_name = f"PPO_{TASK}_{OBS}_{CTR}_{TTS}"
+model_file = os.path.join(models_folder, model_name)
+
+videos_folder = "videos/"
 
 np.random.seed(SEED)
+
 # Wrap the environment to be compatible with SB3
-vec_env = DummyVecEnv([lambda: gym.make('PickCube-v1', 
-                                        obs_mode='state', 
-                                        control_mode='pd_joint_delta_pos', 
-                                        render_mode="rgb_array",
+vec_env = DummyVecEnv([lambda: gym.make(TASK, 
+                                        obs_mode=OBS, 
+                                        control_mode=CTR, 
+                                        render_mode=RDR,
                                         )])
 
 # Define the model (policy network)
 model = PPO("MlpPolicy", vec_env, verbose=1, seed=SEED)
 
 # Train the agent
-model.learn(total_timesteps=total_timesteps)
+model.learn(total_timesteps=TTS)
 
 # Save the trained model
 model.save(model_file)
@@ -35,12 +48,11 @@ model = PPO.load(model_file)
 
 vec_env.close()
 # Create a single environment for evaluation
-eval_env = gym.make("PickCube-v1", 
-                    obs_mode="state", 
-                    control_mode="pd_ee_delta_pos",
-                    render_mode="rgb_array",
+eval_env = gym.make(TASK, 
+                    obs_mode=OBS, 
+                    control_mode=CTR,
+                    render_mode=RDR,
                     viewer_camera_configs=dict(shader_pack="rt-fast"),
-                    # render_mode="human",
                     )
 
 # Reset environment
@@ -67,7 +79,8 @@ eval_env.close()
 
 # Save video
 print("Saving video...")
-video_path = "videos/" + "evaluation_video_" + str(datetime.datetime.now()) + ".mp4"
-imageio.mimsave(video_path, frames, fps=60)
+timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+video_file = os.path.join(videos_folder, f"{model_name}_{timestamp}.mp4")
+imageio.mimsave(video_file, frames, fps=60)
 
-print(f"Video saved at: {video_path}")
+print(f"Video saved at: {video_file}")
